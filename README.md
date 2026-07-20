@@ -4,7 +4,7 @@ Site for the National Science Week 2026 touring lecture series presented by
 Dr Rebecca Marrone and Dr Maria Vieira, Centre for Change and Complexity in
 Learning (C3L), Adelaide University.
 
-Live at **https://national-science-week.c3l.ai**
+Live at **https://c3l-ai.github.io/national-science-week/**
 
 ## What is here
 
@@ -12,7 +12,6 @@ Live at **https://national-science-week.c3l.ai**
 index.html      one page, all content
 styles.css      design tokens and layout
 script.js       map to card linking, scroll reveals
-CNAME           custom domain for GitHub Pages
 .nojekyll       stops Jekyll from touching the build
 assets/img      portraits, poster frames, social card
 assets/videos   final video files, if self hosted
@@ -25,47 +24,35 @@ this folder.
 
 ## Deploy
 
-Every push to `main` checks the site and publishes it. The workflow lives in
-`.github/workflows/deploy.yml` and runs two jobs.
+Every push to `main` publishes the site. The workflow is
+`.github/workflows/deploy.yml`: one job that checks the site, uploads the repo
+as-is, and deploys it. No build step, no Jekyll.
 
-**check** runs `tools/check_links.py`, which fails the build if a local file
-reference is broken, an `#anchor` points nowhere, or a map pin and its event
-card have drifted apart. It then re-runs with `--external` to ping every
-booking and directions link. External results are advisory rather than fatal,
-because Eventbrite and Humanitix both rate limit CI ranges and a red run there
-should not block a content fix.
+The check step runs `tools/check_links.py`, which fails the build if a local
+file reference is broken, an `#anchor` points nowhere, or a map pin and its
+event card have drifted apart. That last one matters, because event data lives
+in the markup twice and is tied together by `data-stop`.
 
-**deploy** uploads the repo as-is and publishes it. No build, no Jekyll.
+### Setup
 
-### First time setup
-
-1. Create the repo and push.
+1. Push to `main`.
 
    ```bash
    git init
    git add .
    git commit -m "Future Minds site"
    git branch -M main
-   git remote add origin git@github.com:<org>/national-science-week.git
+   git remote add origin git@github.com:c3l-ai/national-science-week.git
    git push -u origin main
    ```
 
-2. Repo **Settings > Pages**. Under *Build and deployment*, set **Source** to
-   **GitHub Actions**. This is the step people miss. Leaving it on
-   *Deploy from a branch* means the workflow runs, goes green, and changes
-   nothing.
+2. **Settings > Pages > Build and deployment > Source: GitHub Actions.**
 
-3. In the same screen, set **Custom domain** to
-   `national-science-week.c3l.ai`. The `CNAME` file already holds that value,
-   so the two agree.
+   Pages has to be switched on here before anything publishes. Until it is, the
+   `configure-pages` step has nothing to configure and the site 404s at the
+   `github.io` URL.
 
-4. Add this record at whoever hosts DNS for `c3l.ai`:
-
-   | Type  | Name                    | Value                  |
-   |-------|-------------------------|------------------------|
-   | CNAME | `national-science-week` | `<org>.github.io.`     |
-
-5. Wait for the certificate to issue, then tick **Enforce HTTPS**.
+3. Push again, or **Actions > Deploy to GitHub Pages > Run workflow**.
 
 ### Running the check locally
 
@@ -74,12 +61,43 @@ python3 tools/check_links.py              # local refs, exits 1 on failure
 python3 tools/check_links.py --external   # pings booking links too
 ```
 
-Worth running before you push a change to dates or venues.
+Worth running before pushing any change to dates or venues. To make it
+automatic:
 
-### Deploying by hand
+```bash
+printf '#!/bin/sh\npython3 tools/check_links.py\n' > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
 
-**Actions > Deploy to GitHub Pages > Run workflow.** Useful if a booking link
-changed upstream and you want to re-verify without a commit.
+### Adding the custom domain later
+
+The site is on the default `github.io` URL for now. When you want
+`national-science-week.c3l.ai`:
+
+1. Add a DNS record at whoever hosts `c3l.ai`:
+
+   | Type  | Name                    | Value                |
+   |-------|-------------------------|----------------------|
+   | CNAME | `national-science-week` | `c3l-ai.github.io.`  |
+
+2. **Settings > Pages > Custom domain**, enter the domain, save. GitHub commits
+   a `CNAME` file to the repo for you.
+
+3. Update `og:url` in `index.html` to the new address.
+
+4. Wait for the domain check to pass and the certificate to issue, then tick
+   **Enforce HTTPS**.
+
+All asset paths in the site are relative, so it works at both the subpath and
+the apex without edits.
+
+### If a run hangs on "waiting for a runner"
+
+That is Actions capacity or account state, not the site. Check
+githubstatus.com, then org Settings > Actions > General. Nothing in the repo
+will fix it. Branch deployment (Settings > Pages > Source: Deploy from a
+branch, `main`, `/ (root)`) publishes without a runner if you need the site up
+in the meantime.
 
 ## Adding the videos
 
