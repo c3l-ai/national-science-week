@@ -16,12 +16,28 @@ CNAME           custom domain for GitHub Pages
 .nojekyll       stops Jekyll from touching the build
 assets/img      portraits, poster frames, social card
 assets/videos   final video files, if self hosted
+tools/          pre-deploy link and integrity check
+.github/        deployment workflow
 ```
 
 No build step. Open `index.html` locally, or run `python3 -m http.server` in
 this folder.
 
 ## Deploy
+
+Every push to `main` checks the site and publishes it. The workflow lives in
+`.github/workflows/deploy.yml` and runs two jobs.
+
+**check** runs `tools/check_links.py`, which fails the build if a local file
+reference is broken, an `#anchor` points nowhere, or a map pin and its event
+card have drifted apart. It then re-runs with `--external` to ping every
+booking and directions link. External results are advisory rather than fatal,
+because Eventbrite and Humanitix both rate limit CI ranges and a red run there
+should not block a content fix.
+
+**deploy** uploads the repo as-is and publishes it. No build, no Jekyll.
+
+### First time setup
 
 1. Create the repo and push.
 
@@ -34,11 +50,14 @@ this folder.
    git push -u origin main
    ```
 
-2. Repo **Settings > Pages**. Source: *Deploy from a branch*, branch `main`,
-   folder `/ (root)`.
+2. Repo **Settings > Pages**. Under *Build and deployment*, set **Source** to
+   **GitHub Actions**. This is the step people miss. Leaving it on
+   *Deploy from a branch* means the workflow runs, goes green, and changes
+   nothing.
 
-3. Under **Custom domain** enter `national-science-week.c3l.ai` and save.
-   The `CNAME` file in this repo already holds that value.
+3. In the same screen, set **Custom domain** to
+   `national-science-week.c3l.ai`. The `CNAME` file already holds that value,
+   so the two agree.
 
 4. Add this record at whoever hosts DNS for `c3l.ai`:
 
@@ -47,6 +66,20 @@ this folder.
    | CNAME | `national-science-week` | `<org>.github.io.`     |
 
 5. Wait for the certificate to issue, then tick **Enforce HTTPS**.
+
+### Running the check locally
+
+```bash
+python3 tools/check_links.py              # local refs, exits 1 on failure
+python3 tools/check_links.py --external   # pings booking links too
+```
+
+Worth running before you push a change to dates or venues.
+
+### Deploying by hand
+
+**Actions > Deploy to GitHub Pages > Run workflow.** Useful if a booking link
+changed upstream and you want to re-verify without a commit.
 
 ## Adding the videos
 
